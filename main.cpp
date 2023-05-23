@@ -44,7 +44,22 @@ struct Snake {
             DrawRectangle(segment.positionX, segment.positionY, sizeX, sizeY, DARKBLUE);
         }
     }
+
 };
+
+void game_over(Snake& mySnake) {
+
+    // Display game over text
+    DrawText("Game Over! Press 'R' to reset!", 190, 200, 20, DARKBLUE);
+
+    // Reset the Snake
+    mySnake.segments[0].positionX = GetScreenWidth() / 2;
+    mySnake.segments[0].positionY = GetScreenHeight() / 2;
+    mySnake.segments.clear();
+
+    mySnake.segments.push_back({ GetScreenWidth() / 2, GetScreenHeight() / 2 });
+
+}
 
 struct Food {
     int positionX;
@@ -130,6 +145,23 @@ int main(void)
             myFood.positionY = randomHeight * 5;
 
             mySnake.grow();
+        }
+
+        // If the snake goes out of the screen
+        if (mySnake.segments[0].positionX < 0 || mySnake.segments[0].positionX > GetScreenWidth() ||
+            mySnake.segments[0].positionY < 0 || mySnake.segments[0].positionY > GetScreenHeight())
+        {
+            game_over(mySnake);
+        }
+
+        // If the snake runs into itself
+        for (int i = 1; i < mySnake.segments.size(); i++) {
+            if (mySnake.segments[0].positionX == mySnake.segments[i].positionX &&
+                mySnake.segments[0].positionY == mySnake.segments[i].positionY) {
+
+                game_over(mySnake);
+            
+            }
         }
 
         BeginDrawing();
