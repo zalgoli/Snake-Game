@@ -1,177 +1,119 @@
 #include "raylib.h"
-
-#include <vector>
-#include <random>
-
-struct Segment {
-    int positionX;
-    int positionY;
-};
-
-struct Snake {
-    std::vector<Segment> segments;
-    float speedX;
-    float speedY;
-
-    // The snake's size is now fixed, as every segment has the same size
-    static constexpr int sizeX = 20;
-    static constexpr int sizeY = 20;
-
-    // Constructor to initialize the snake with one segment in the middle of the screen
-    Snake() {
-        segments.push_back({ GetScreenWidth() / 2, GetScreenHeight() / 2 });
-        speedX = 10;
-        speedY = 0;
-    }
-
-    void move(int deltaX, int deltaY) {
-        for (int i = segments.size() - 1; i > 0; i--) {
-            segments[i].positionX = segments[i - 1].positionX;
-            segments[i].positionY = segments[i - 1].positionY;
-        }
-
-        segments[0].positionX += deltaX;
-        segments[0].positionY += deltaY;
-    }
-
-    void grow() {
-        segments.push_back({ segments.back().positionX,segments.back().positionY });
-        segments.push_back({ segments.back().positionX,segments.back().positionY });
-    }
-
-    void draw() {
-        for (const auto& segment : segments) {
-            DrawRectangle(segment.positionX, segment.positionY, sizeX, sizeY, DARKBLUE);
-        }
-    }
-
-};
-
-void game_over(Snake& mySnake) {
-
-    // Display game over text
-    DrawText("Game Over! Press 'R' to reset!", 190, 200, 20, DARKBLUE);
-
-    // Reset the Snake
-    mySnake.segments[0].positionX = GetScreenWidth() / 2;
-    mySnake.segments[0].positionY = GetScreenHeight() / 2;
-    mySnake.segments.clear();
-
-    mySnake.segments.push_back({ GetScreenWidth() / 2, GetScreenHeight() / 2 });
-
-}
-
-struct Food {
-    int positionX;
-    int positionY;
-
-    void Spawn() {
-        DrawRectangle(positionX, positionY, 20, 20, RED);
-    }
-};
-
+#include "Snake.h"
+#include "Food.h"
+#include <string>
 
 int main(void)
 {
     InitWindow(800, 450, "Snake Game");
     SetWindowState(FLAG_VSYNC_HINT);
 
-    // Instantiating the Snake
-    Snake mySnake;
+    bool restart = false;
 
-    // Instantiating the Food
-    Food myFood;
-    std::random_device rd;
-    std::mt19937 engine(rd());
+    do {
+        restart = false; // Reset restart flag at the beginning of each game
+        Snake mySnake;
+        float accumulatedTime = 0;
+        float stepTime = 0.1f;
 
-    // Create distributions for Food spawning place
-    std::uniform_int_distribution<int> distribution1(0, GetScreenHeight() / 5);
-    std::uniform_int_distribution<int> distribution2(0, GetScreenWidth() / 5);
+        bool isGameOver = false;
+        int segmentsToGrow = 0;
 
-    // Generate random numbers
-    int randomHeight = distribution1(engine);
-    int randomWidth = distribution2(engine);
+        int snakeSize = 1;
 
-    myFood.positionX = randomWidth * 5;
-    myFood.positionY = randomHeight * 5;
+        Food myFood;
+        myFood.spawn();
 
-    float stepTime = 0.15f;
-    float accumulatedTime = 0.0f;
+        while (!WindowShouldClose()) {
 
-    while (!WindowShouldClose())
-    {
+            float deltaTime = GetFrameTime();
+            accumulatedTime += deltaTime;
 
-        float deltaTime = GetFrameTime();
+            // Core logic behind the step-based movement of the snake
+            if (accumulatedTime > stepTime && !isGameOver) {
+                mySnake.move(mySnake.speedX, mySnake.speedY);
+                accumulatedTime -= stepTime;
 
-        accumulatedTime += deltaTime;
+                if (segmentsToGrow > 0) {
+                    mySnake.grow();
+                    segmentsToGrow--;
+                }
 
-        if (accumulatedTime > stepTime) {
-            mySnake.move(mySnake.speedX, mySnake.speedY);
-            accumulatedTime -= stepTime;
-        }
+                // Handling key bindings
+                if (IsKeyDown(KEY_UP)) mySnake.speedX = 0, mySnake.speedY = mySnake.speed * -1;
+                if (IsKeyDown(KEY_DOWN)) mySnake.speedX = 0, mySnake.speedY = mySnake.speed;
+                if (IsKeyDown(KEY_LEFT)) mySnake.speedX = mySnake.speed * -1, mySnake.speedY = 0;
+                if (IsKeyDown(KEY_RIGHT)) mySnake.speedX = mySnake.speed, mySnake.speedY = 0;
 
-        // Moving UP
-        if (IsKeyPressed(KEY_UP)) {
-            mySnake.speedX = 0;
-            mySnake.speedY = -20;
-        }
+                // When the snake collides with itself
+                for (int i = 1; i < mySnake.segments.size(); i++) {
+                    if (mySnake.segments[0].positionX == mySnake.segments[i].positionX &&
+                        mySnake.segments[0].positionY == mySnake.segments[i].positionY)
+                    {
+                        isGameOver = true;
+                    }
+                }
 
-        // Moving DOWN
-        if (IsKeyPressed(KEY_DOWN)) {
-            mySnake.speedX = 0;
-            mySnake.speedY = 20;
-        }
+                // When the snake collides with the wall
+                if (mySnake.segments[0].positionX < 0 || mySnake.segments[0].positionX > GetScreenWidth() ||
+                    mySnake.segments[0].positionY < 0 || mySnake.segments[0].positionY > GetScreenHeight())
+                {
+                    isGameOver = true;
+                }
 
-        // Moving LEFT
-        if (IsKeyPressed(KEY_LEFT)) {
-            mySnake.speedX = -20;
-            mySnake.speedY = 0;
-        }
+                // Handling collision of Snake and Food (i.e. "eating")
+                Rectangle snakeHead = { mySnake.segments[0].positionX, mySnake.segments[0].positionY, mySnake.size, mySnake.size };
+                Rectangle foodRect = { myFood.positionX, myFood.positionY, myFood.size, myFood.size };
 
-        // Moving RIGHT
-        if (IsKeyPressed(KEY_RIGHT)) {
-            mySnake.speedX = 20;
-            mySnake.speedY = 0;
-        }
-
-        if (CheckCollisionRecs({ (float)mySnake.segments[0].positionX, (float)mySnake.segments[0].positionY, (float)mySnake.sizeX, (float)mySnake.sizeY },
-            { (float)myFood.positionX, (float)myFood.positionY, 20.0f, 20.0f }))
-        {
-            // Generate new random numbers
-            int randomHeight = distribution1(engine);
-            int randomWidth = distribution2(engine);
-
-            myFood.positionX = randomWidth * 5;
-            myFood.positionY = randomHeight * 5;
-
-            mySnake.grow();
-        }
-
-        // If the snake goes out of the screen
-        if (mySnake.segments[0].positionX < 0 || mySnake.segments[0].positionX > GetScreenWidth() ||
-            mySnake.segments[0].positionY < 0 || mySnake.segments[0].positionY > GetScreenHeight())
-        {
-            game_over(mySnake);
-        }
-
-        // If the snake runs into itself
-        for (int i = 1; i < mySnake.segments.size(); i++) {
-            if (mySnake.segments[0].positionX == mySnake.segments[i].positionX &&
-                mySnake.segments[0].positionY == mySnake.segments[i].positionY) {
-
-                game_over(mySnake);
-            
+                if (CheckCollisionRecs(snakeHead, foodRect))
+                {
+                    segmentsToGrow++;
+                    myFood.spawn();
+                    snakeSize += 1;
+                }
             }
+
+            BeginDrawing();
+            ClearBackground(RAYWHITE);
+
+            // Displaying Score
+            std::string scoreString = "Snake Size: " + std::to_string(mySnake.segments.size());
+            const char* scoreText = scoreString.c_str();
+
+            int fontSize = 20;
+            Vector2 scoreTextPosition = { GetScreenWidth() / 2 - MeasureText(scoreText, fontSize) / 2, 10 };
+            DrawText(scoreText, scoreTextPosition.x, scoreTextPosition.y, fontSize, DARKBLUE);
+
+            // Handling Game Over text logic
+            if (isGameOver) {
+                const char* gameOverText = "Game Over!";
+                const char* pressR = "Press 'R' to play again.";
+                int gameOverFontSize = 50;
+                int pressRFontSize = 20;
+
+                // Measuring text width and height
+                Vector2 gameOverTextSize = MeasureTextEx(GetFontDefault(), gameOverText, gameOverFontSize, 1);
+                Vector2 pressRSize = MeasureTextEx(GetFontDefault(), pressR, pressRFontSize, 1);
+
+                // Printing Game Over text at the exact center of the screen
+                DrawText(gameOverText, GetScreenWidth() / 2 - (gameOverTextSize.x / 2), GetScreenHeight() / 2 - (gameOverTextSize.y / 2), gameOverFontSize, RED);
+                DrawText(pressR, GetScreenWidth() / 2 - (pressRSize.x / 2) + 10, GetScreenHeight() / 2 - pressRSize.y / 2 + 40, pressRFontSize, RED);
+
+                if (IsKeyPressed(KEY_R)) {
+                    restart = true;
+                    break;
+                }
+            }
+            // Drawing Game elements
+            else {
+                mySnake.draw();
+                DrawRectangle(myFood.positionX, myFood.positionY, myFood.size, myFood.size, RED);
+                DrawFPS(10, 10);
+            }
+
+            EndDrawing();
         }
-
-        BeginDrawing();
-        ClearBackground(RAYWHITE);
-        DrawFPS(10, 10);
-        mySnake.draw();
-        myFood.Spawn();
-
-        EndDrawing();
-    }
+    } while (restart);
 
     CloseWindow();
 
