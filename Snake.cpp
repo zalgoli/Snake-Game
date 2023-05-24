@@ -40,10 +40,24 @@ void Snake::grow() {
 
 
 void Snake::draw() {
-	for (const auto& segment : segments) {
-		DrawRectangle(segment.positionX, segment.positionY, size, size, DARKBLUE);
-	}
+
+    Color baseColor = DARKBLUE;
+    float hueIncrement = 0.01f; // Increment for hue value
+
+    for (size_t i = 0; i < segments.size(); i++) {
+        // Calculate hue value for the current segment
+        float hue = baseColor.a / 360.0f + hueIncrement * i;
+        if (hue > 1.0f) {
+            hue -= 1.0f;
+        }
+        Color segmentColor = ColorFromHSV(hue * 360.0f, 1.0f, 1.0f);
+
+        // Draw the segment with the calculated color
+        DrawRectangle(segments[i].positionX, segments[i].positionY, size, size, segmentColor);
+    }
 }
+
+
 
 
 Snake::Snake() {
